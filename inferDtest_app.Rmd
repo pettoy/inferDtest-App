@@ -1,0 +1,145 @@
+---
+title: "inferDtest App: infer diagnostic test results" 
+author: "Peter Toyinbo"
+date: "March 18, 2018"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(shiny)
+library(plotly)
+```
+
+
+
+
+```{r eruptions, echo=FALSE}
+inputPanel(
+        h4("The information you need before your diagnostic test --->"),
+        helpText("The PREVALENCE of the condition you wish to diagnose is what proportion of the subject's population has the condition."),
+        helpText("The SENSITIVITY of your test is the chance (in a hundred) that the test is positive given that the subject has the condition."),
+        helpText("The SPECIFICITY of your test is the chance (in a hundred) that the test is negative given that the subject does not have the condition."),
+        
+        h4("What you infer from the diagnostic test result --->"),
+        helpText("The POSITIVE PREDICTIVE VALUE is the chance (in a hundred) that the subject actually has the condition given that the test is POSITIVE."),
+        helpText("The NEGATIVE PREDICTIVE VALUE is the chance (in a hundred) that the subject does not have the condition given that the test is NEGATIVE."),
+        helpText("The DIAGNOSTIC LIKELIHOOD RATIO of a POSITIVE test is how many times the post-test odds of the condition is greater than the pre-test odds, regardless of the prevalence of the condition."),
+        helpText("The DIAGNOSTIC LIKELIHOOD RATIO of a NEGATIVE test is how much the post-test odds of the condition is less (in % points) than the pre-test odds, regardless of the prevalence of the condition."),
+      
+        h4("To use inferDtest --->"),
+        helpText("Use the sliders to input the sensitivity and specificity associated with your diagnostic test, and the prevalence of the condition you wish to diagnose."),
+        helpText("Hover on the plots to read the output: computed values that measure the accuracy of your test."),
+        
+        h5("The outputs are automatically updated whenever your inputs change. Also, you can explore WHAT IF scenarios of interest --->"),
+        sliderInput("prev", "Prevalence of the condition", min = .001, 
+                            max = .4, value = .1, width = 350),
+        sliderInput("sens", "Sensitivity of the test", 
+                            min = .01, max = 1, value = .8, step = .01),
+        sliderInput("spec", "Specificity of the test", 
+                            min = .01, max = 1, value = .8, step = .01)
+
+ 
+)
+
+renderPlotly({
+
+# Write convenience functions for computing predictive values and diagnostic likelihood ratios
+        
+compute_ppv <- function(prev, sens, spec) {
+                round(sens*prev / (sens*prev + (1-spec)*(1-prev)),3)
+        }
+compute_npv <- function(prev, sens, spec) {
+                round(((1-prev)*spec) /( (prev*(1-spec))+(spec*(1-prev)) ),3)
+        }
+compute_dlrp <- function(sens, spec) {
+                round(sens/(1-spec),3)
+        }
+compute_dlrn <- function(sens, spec) {
+                round((1-sens)/spec, 3)
+        }  
+  
+# compute the statistics
+        
+ppv <- compute_ppv(input$prev, input$sens, input$spec)
+npv <- compute_npv(input$prev, input$sens, input$spec)
+dlrp <- compute_dlrp(input$sens, input$spec)
+dlrn <- compute_dlrn(input$sens, input$spec)
+ 
+# Predictive Value barplot
+
+               p1 <- plot_ly() %>%
+                        add_bars(
+                                x = "Predictive Values",
+                                y = npv*100,
+                                base = -npv*100,
+                                marker = list(
+                                        color = 'green'
+                                ),
+                                name = 'Negative test',
+                                text = paste("Chance of not having the condition 
+                                             given a negative test is", 
+                                             npv*100, "%", sep = " ")
+                        ) %>%
+                        add_bars(
+                                x = "Predictive Values",
+                                y = ppv*100,
+                                base = 0,
+                                marker = list(
+                                        color = 'red'
+                                ),
+                                name = 'Positive test',
+                                text = paste("Chance of having the condition 
+                                             given a positive test is", 
+                                             ppv*100, "%", sep = " ")
+                        )
+
+ 
+ # Diagnostic Likelihood Ratio barplot
+                
+               p2 <-  plot_ly() %>%
+                        add_bars(
+                                x = "Diagnostic Likelihood Ratios",
+                                y = dlrn*100,
+                                base = -dlrn*100,
+                                marker = list(
+                                        color = 'green'
+                                ),
+                                name = 'Negative test',
+                                text = paste("The post-test odds of the condition is 
+                             lower at", 
+                                             dlrn*100, "% of the pre-test odds", 
+                                             sep = " ")
+                        ) %>%
+                        add_bars(
+                                x = "Diagnostic Likelihood Ratios",
+                                y = dlrp,
+                                base = 0,
+                                marker = list(
+                                        color = 'red'
+                                ),
+                                name = 'Positive test',
+                                text = paste("The post-test odds of the condition is 
+                             higher by", 
+                                             dlrp, "times the pre-test odds", 
+                                             sep = " ")
+                                
+                        )
+               
+               p <- subplot(p1, p2, nrows = 1) %>%
+                       layout(title = "Interpreting the Test Result")
+               p
+})
+ 
+
+        
+
+
+
+```
+
+
+
